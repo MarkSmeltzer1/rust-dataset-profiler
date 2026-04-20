@@ -32,3 +32,10 @@ pub struct CsvProfile {
     pub malformed_rows: Vec<MalformedRowInfo>,
     pub columns: Vec<ColumnProfile>,
 }
+
+#[derive(Debug)]
+pub struct CsvPreview {
+    pub file_path: String,
+    pub column_count: usize,
+    pub headers: Vec<String>,
+}

@@ -2,10 +2,38 @@ use std::error::Error;
 use std::fs::File;
 
 use csv::StringRecord;
+use tracing::info;
 
-use crate::types::{ColumnProfile, CsvProfile, InferredType, MalformedRowInfo};
+use crate::types::{ColumnProfile, CsvPreview, CsvProfile, InferredType, MalformedRowInfo};
+
+pub fn preview_csv(file_path: &str, delimiter: u8) -> Result<CsvPreview, Box<dyn Error>> {
+    info!("Opening CSV file for dry run: {}", file_path);
+
+    let file = File::open(file_path)?;
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .from_reader(file);
+
+    let headers = reader
+        .headers()?
+        .iter()
+        .map(|h| h.to_string())
+        .collect::<Vec<String>>();
+
+    let column_count = headers.len();
+
+    info!("Dry run found {} columns", column_count);
+
+    Ok(CsvPreview {
+        file_path: file_path.to_string(),
+        column_count,
+        headers,
+    })
+}
 
 pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn Error>> {
+    info!("Opening CSV file for full profiling: {}", file_path);
+
     let file = File::open(file_path)?;
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(delimiter)
@@ -22,6 +50,8 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
     let mut row_count = 0usize;
     let mut malformed_row_count = 0usize;
     let mut malformed_rows: Vec<MalformedRowInfo> = Vec::new();
+
+    info!("Detected {} columns", column_count);
 
     let mut columns: Vec<ColumnProfile> = headers
         .iter()
@@ -62,6 +92,9 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
                 merge_inferred_types(&columns[i].inferred_type, &field_type);
         }
     }
+
+    info!("Processed {} rows", row_count);
+    info!("Found {} malformed rows", malformed_row_count);
 
     Ok(CsvProfile {
         file_path: file_path.to_string(),

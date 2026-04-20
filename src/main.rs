@@ -1,36 +1,61 @@
 mod cli;
+mod logging;
 mod readers;
 mod types;
 
 use clap::Parser;
 use cli::Cli;
-use readers::csv::profile_csv;
+use readers::csv::{preview_csv, profile_csv};
+use tracing::{info, warn};
 
 fn main() {
     let args = Cli::parse();
 
-    println!("Dataset Profiler Starting...");
-    println!("File: {}", args.file);
+    logging::init_logging(args.verbose);
 
-    if let Some(format) = &args.format {
-        println!("Format: {}", format);
-    } else {
-        println!("Format: auto-detect");
-    }
-
-    println!("Delimiter: {}", args.delimiter);
-    println!("Verbose: {}", args.verbose);
-    println!("Dry Run: {}", args.dry_run);
-    println!();
+    info!("Starting dataset profiler");
+    info!("Input file: {}", args.file);
 
     let detected_format = match &args.format {
         Some(fmt) => fmt.to_lowercase(),
         None => detect_format(&args.file),
     };
 
+    info!("Detected format: {}", detected_format);
+
+    if args.dry_run {
+        info!("Dry-run mode enabled");
+
+        match detected_format.as_str() {
+            "csv" => match preview_csv(&args.file, args.delimiter as u8) {
+                Ok(preview) => {
+                    println!("Dataset Profiler Dry Run");
+                    println!("------------------------");
+                    println!("File: {}", preview.file_path);
+                    println!("Format: csv");
+                    println!("Columns: {}", preview.column_count);
+                    println!("Headers: {:?}", preview.headers);
+                    println!("Dry run complete. Full profiling was skipped.");
+                }
+                Err(e) => {
+                    eprintln!("Error during dry run: {}", e);
+                    std::process::exit(1);
+                }
+            },
+            _ => {
+                eprintln!("Unsupported format: {}", detected_format);
+                std::process::exit(1);
+            }
+        }
+
+        return;
+    }
+
     match detected_format.as_str() {
         "csv" => match profile_csv(&args.file, args.delimiter as u8) {
             Ok(profile) => {
+                info!("CSV profiling completed successfully");
+
                 println!("CSV Profile Summary");
                 println!("-------------------");
                 println!("File: {}", profile.file_path);
@@ -40,6 +65,8 @@ fn main() {
                 println!();
 
                 if !profile.malformed_rows.is_empty() {
+                    warn!("Malformed rows detected: {}", profile.malformed_row_count);
+
                     println!("Malformed Row Details:");
                     for bad_row in &profile.malformed_rows {
                         println!(
