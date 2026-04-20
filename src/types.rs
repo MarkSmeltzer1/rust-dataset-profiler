@@ -21,5 +21,6 @@ pub struct CsvProfile {
     pub file_path: String,
     pub row_count: usize,
     pub column_count: usize,
+    pub malformed_row_count: usize,
     pub columns: Vec<ColumnProfile>,
 }

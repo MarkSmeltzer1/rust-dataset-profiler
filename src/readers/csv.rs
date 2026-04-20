@@ -9,6 +9,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
     let file = File::open(file_path)?;
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(delimiter)
+        .flexible(true)
         .from_reader(file);
 
     let headers = reader
@@ -19,6 +20,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
 
     let column_count = headers.len();
     let mut row_count = 0usize;
+    let mut malformed_row_count = 0usize;
 
     let mut columns: Vec<ColumnProfile> = headers
         .iter()
@@ -33,6 +35,11 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
     for result in reader.records() {
         let record: StringRecord = result?;
         row_count += 1;
+
+        if record.len() != column_count {
+            malformed_row_count += 1;
+            continue;
+        }
 
         for (i, field) in record.iter().enumerate() {
             columns[i].total_count += 1;
@@ -54,6 +61,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
         file_path: file_path.to_string(),
         row_count,
         column_count,
+        malformed_row_count,
         columns,
     })
 }
@@ -81,7 +89,11 @@ fn merge_inferred_types(current: &InferredType, new_type: &InferredType) -> Infe
         (String, String) => String,
         (Integer, Float) | (Float, Integer) => Float,
         (Mixed, _) | (_, Mixed) => Mixed,
-        (current_type, new_type) if std::mem::discriminant(current_type) == std::mem::discriminant(new_type) => current_type.clone(),
+        (current_type, new_type)
+            if std::mem::discriminant(current_type) == std::mem::discriminant(new_type) =>
+        {
+            current_type.clone()
+        }
         _ => Mixed,
     }
 }

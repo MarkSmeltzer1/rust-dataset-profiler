@@ -36,6 +36,7 @@ fn main() {
                 println!("File: {}", profile.file_path);
                 println!("Rows: {}", profile.row_count);
                 println!("Columns: {}", profile.column_count);
+                println!("Malformed Rows: {}", profile.malformed_row_count);
                 println!();
 
                 println!("Column Stats:");
