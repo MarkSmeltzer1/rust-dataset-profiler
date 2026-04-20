@@ -17,10 +17,18 @@ pub struct ColumnProfile {
 }
 
 #[derive(Debug)]
+pub struct MalformedRowInfo {
+    pub row_number: usize,
+    pub expected_fields: usize,
+    pub found_fields: usize,
+}
+
+#[derive(Debug)]
 pub struct CsvProfile {
     pub file_path: String,
     pub row_count: usize,
     pub column_count: usize,
     pub malformed_row_count: usize,
+    pub malformed_rows: Vec<MalformedRowInfo>,
     pub columns: Vec<ColumnProfile>,
 }

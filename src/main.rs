@@ -39,6 +39,17 @@ fn main() {
                 println!("Malformed Rows: {}", profile.malformed_row_count);
                 println!();
 
+                if !profile.malformed_rows.is_empty() {
+                    println!("Malformed Row Details:");
+                    for bad_row in &profile.malformed_rows {
+                        println!(
+                            "row {} -> expected {} fields, found {}",
+                            bad_row.row_number, bad_row.expected_fields, bad_row.found_fields
+                        );
+                    }
+                    println!();
+                }
+
                 println!("Column Stats:");
                 for col in profile.columns {
                     println!(

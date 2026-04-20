@@ -3,7 +3,7 @@ use std::fs::File;
 
 use csv::StringRecord;
 
-use crate::types::{ColumnProfile, CsvProfile, InferredType};
+use crate::types::{ColumnProfile, CsvProfile, InferredType, MalformedRowInfo};
 
 pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn Error>> {
     let file = File::open(file_path)?;
@@ -21,6 +21,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
     let column_count = headers.len();
     let mut row_count = 0usize;
     let mut malformed_row_count = 0usize;
+    let mut malformed_rows: Vec<MalformedRowInfo> = Vec::new();
 
     let mut columns: Vec<ColumnProfile> = headers
         .iter()
@@ -38,6 +39,11 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
 
         if record.len() != column_count {
             malformed_row_count += 1;
+            malformed_rows.push(MalformedRowInfo {
+                row_number: row_count,
+                expected_fields: column_count,
+                found_fields: record.len(),
+            });
             continue;
         }
 
@@ -62,6 +68,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
         row_count,
         column_count,
         malformed_row_count,
+        malformed_rows,
         columns,
     })
 }
