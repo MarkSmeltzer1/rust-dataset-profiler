@@ -10,13 +10,17 @@ pub struct Cli {
     #[arg(short, long)]
     pub file: String,
 
+    /// Optional config file path
+    #[arg(long)]
+    pub config: Option<String>,
+
     /// File format (csv, json, parquet)
     #[arg(long)]
     pub format: Option<String>,
 
     /// CSV delimiter
-    #[arg(long, default_value = ",")]
-    pub delimiter: char,
+    #[arg(long)]
+    pub delimiter: Option<char>,
 
     /// Enable verbose logging
     #[arg(long, default_value_t = false)]

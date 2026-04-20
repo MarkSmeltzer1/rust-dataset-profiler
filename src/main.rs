@@ -1,10 +1,12 @@
 mod cli;
+mod config;
 mod logging;
 mod readers;
 mod types;
 
 use clap::Parser;
 use cli::Cli;
+use config::{load_config, AppConfig};
 use readers::csv::{preview_csv, profile_csv};
 use tracing::{info, warn};
 use types::InferredType;
@@ -12,28 +14,59 @@ use types::InferredType;
 fn main() {
     let args = Cli::parse();
 
-    logging::init_logging(args.verbose);
+    let file_path = args.file.clone();
 
-    info!("Starting dataset profiler");
-    info!("Input file: {}", args.file);
-
-    let detected_format = match &args.format {
-        Some(fmt) => fmt.to_lowercase(),
-        None => detect_format(&args.file),
+    let config = match &args.config {
+        Some(path) => match load_config(path) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                eprintln!("Failed to load config file '{}': {}", path, e);
+                std::process::exit(1);
+            }
+        },
+        None => AppConfig::default(),
     };
 
-    info!("Detected format: {}", detected_format);
+    let verbose = if args.verbose {
+        true
+    } else {
+        config.verbose.unwrap_or(false)
+    };
 
-    if args.dry_run {
+    logging::init_logging(verbose);
+
+    let format = args
+        .format
+        .clone()
+        .or(config.format.clone())
+        .unwrap_or_else(|| detect_format(&file_path));
+
+    let delimiter = args
+        .delimiter
+        .or(config.delimiter)
+        .unwrap_or(',');
+
+    let dry_run = if args.dry_run {
+        true
+    } else {
+        config.dry_run.unwrap_or(false)
+    };
+
+    info!("Starting dataset profiler");
+    info!("Input file: {}", file_path);
+    info!("Detected format: {}", format);
+
+    if dry_run {
         info!("Dry-run mode enabled");
 
-        match detected_format.as_str() {
-            "csv" => match preview_csv(&args.file, args.delimiter as u8) {
+        match format.as_str() {
+            "csv" => match preview_csv(&file_path, delimiter as u8) {
                 Ok(preview) => {
                     println!("Dataset Profiler Dry Run");
                     println!("------------------------");
                     println!("File: {}", preview.file_path);
                     println!("Format: csv");
+                    println!("Delimiter: {}", delimiter);
                     println!("Columns: {}", preview.column_count);
                     println!("Headers: {:?}", preview.headers);
                     println!("Dry run complete. Full profiling was skipped.");
@@ -44,7 +77,7 @@ fn main() {
                 }
             },
             _ => {
-                eprintln!("Unsupported format: {}", detected_format);
+                eprintln!("Unsupported format: {}", format);
                 std::process::exit(1);
             }
         }
@@ -52,8 +85,8 @@ fn main() {
         return;
     }
 
-    match detected_format.as_str() {
-        "csv" => match profile_csv(&args.file, args.delimiter as u8) {
+    match format.as_str() {
+        "csv" => match profile_csv(&file_path, delimiter as u8) {
             Ok(profile) => {
                 info!("CSV profiling completed successfully");
 
@@ -61,7 +94,7 @@ fn main() {
                 println!("-------------------");
                 println!("File: {}", profile.file_path);
                 println!("Format: csv");
-                println!("Delimiter: {}", args.delimiter);
+                println!("Delimiter: {}", delimiter);
                 println!("Rows: {}", profile.row_count);
                 println!("Columns: {}", profile.column_count);
                 println!("Malformed Rows: {}", profile.malformed_row_count);
@@ -91,24 +124,24 @@ fn main() {
                     match col.inferred_type {
                         InferredType::Integer | InferredType::Float => {
                             println!(
-                                "{} -> type: {}, nulls: {}, total: {}, min: {:?}, max: {:?}",
+                                "{} -> type: {}, nulls: {}, total: {}, min: {}, max: {}",
                                 col.name,
                                 display_type(&col.inferred_type),
                                 col.null_count,
                                 col.total_count,
-                                col.numeric_min,
-                                col.numeric_max
+                                format_optional_f64(col.numeric_min),
+                                format_optional_f64(col.numeric_max)
                             );
                         }
                         InferredType::String | InferredType::Mixed => {
                             println!(
-                                "{} -> type: {}, nulls: {}, total: {}, min_len: {:?}, max_len: {:?}, avg_len: {:.2}",
+                                "{} -> type: {}, nulls: {}, total: {}, min_len: {}, max_len: {}, avg_len: {:.2}",
                                 col.name,
                                 display_type(&col.inferred_type),
                                 col.null_count,
                                 col.total_count,
-                                col.min_length,
-                                col.max_length,
+                                format_optional_usize(col.min_length),
+                                format_optional_usize(col.max_length),
                                 avg_length
                             );
                         }
@@ -130,7 +163,7 @@ fn main() {
             }
         },
         _ => {
-            eprintln!("Unsupported format: {}", detected_format);
+            eprintln!("Unsupported format: {}", format);
             std::process::exit(1);
         }
     }
@@ -155,5 +188,19 @@ fn display_type(t: &InferredType) -> &'static str {
         InferredType::Boolean => "boolean",
         InferredType::String => "string",
         InferredType::Mixed => "mixed",
+    }
+}
+
+fn format_optional_f64(value: Option<f64>) -> String {
+    match value {
+        Some(v) => format!("{:.2}", v),
+        None => "N/A".to_string(),
+    }
+}
+
+fn format_optional_usize(value: Option<usize>) -> String {
+    match value {
+        Some(v) => v.to_string(),
+        None => "N/A".to_string(),
     }
 }
