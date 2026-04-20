@@ -60,6 +60,12 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
             null_count: 0,
             total_count: 0,
             inferred_type: InferredType::Unknown,
+            numeric_min: None,
+            numeric_max: None,
+            min_length: None,
+            max_length: None,
+            total_length: 0,
+            non_null_count: 0,
         })
         .collect();
 
@@ -87,9 +93,36 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
                 continue;
             }
 
+            columns[i].non_null_count += 1;
+
+            let field_length = trimmed.len();
+            columns[i].total_length += field_length;
+
+            columns[i].min_length = Some(match columns[i].min_length {
+                Some(current) => current.min(field_length),
+                None => field_length,
+            });
+
+            columns[i].max_length = Some(match columns[i].max_length {
+                Some(current) => current.max(field_length),
+                None => field_length,
+            });
+
             let field_type = infer_field_type(trimmed);
             columns[i].inferred_type =
                 merge_inferred_types(&columns[i].inferred_type, &field_type);
+
+            if let Ok(value) = trimmed.parse::<f64>() {
+                columns[i].numeric_min = Some(match columns[i].numeric_min {
+                    Some(current) => current.min(value),
+                    None => value,
+                });
+
+                columns[i].numeric_max = Some(match columns[i].numeric_max {
+                    Some(current) => current.max(value),
+                    None => value,
+                });
+            }
         }
     }
 

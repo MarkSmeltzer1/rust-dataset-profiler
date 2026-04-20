@@ -14,6 +14,14 @@ pub struct ColumnProfile {
     pub null_count: usize,
     pub total_count: usize,
     pub inferred_type: InferredType,
+
+    pub numeric_min: Option<f64>,
+    pub numeric_max: Option<f64>,
+
+    pub min_length: Option<usize>,
+    pub max_length: Option<usize>,
+    pub total_length: usize,
+    pub non_null_count: usize,
 }
 
 #[derive(Debug)]
