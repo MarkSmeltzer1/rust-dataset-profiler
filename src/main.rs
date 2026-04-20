@@ -36,8 +36,15 @@ fn main() {
                 println!("File: {}", profile.file_path);
                 println!("Rows: {}", profile.row_count);
                 println!("Columns: {}", profile.column_count);
-                println!("Headers: {:?}", profile.headers);
-                println!("Null / Empty Values: {}", profile.null_count);
+                println!();
+
+                println!("Column Stats:");
+                for col in profile.columns {
+                    println!(
+                        "{} -> type: {:?}, nulls: {}, total: {}",
+                        col.name, col.inferred_type, col.null_count, col.total_count
+                    );
+                }
             }
             Err(e) => {
                 eprintln!("Error profiling CSV: {}", e);
