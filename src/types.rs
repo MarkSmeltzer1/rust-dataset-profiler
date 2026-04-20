@@ -48,3 +48,21 @@ pub struct CsvPreview {
     pub column_count: usize,
     pub headers: Vec<String>,
 }
+
+#[derive(Debug)]
+pub struct JsonProfile {
+    pub file_path: String,
+    pub row_count: usize,
+    pub column_count: usize,
+    pub malformed_row_count: usize,
+    pub malformed_rows: Vec<usize>,
+    pub columns: Vec<ColumnProfile>,
+    pub total_row_width: usize,
+}
+
+#[derive(Debug)]
+pub struct JsonPreview {
+    pub file_path: String,
+    pub column_count: usize,
+    pub keys: Vec<String>,
+}

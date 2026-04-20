@@ -10,6 +10,7 @@ use clap::Parser;
 use cli::Cli;
 use config::{load_config, AppConfig};
 use readers::csv::{preview_csv, profile_csv};
+use readers::json::{preview_json, profile_json};
 use tracing::{info, warn};
 use types::InferredType;
 
@@ -83,6 +84,24 @@ fn main() {
                     std::process::exit(1);
                 }
             },
+            "json" | "jsonl" | "ndjson" => match preview_json(&file_path) {
+                Ok(preview) => {
+                    let elapsed = start_time.elapsed().as_secs_f64();
+
+                    println!("Dataset Profiler Dry Run");
+                    println!("------------------------");
+                    println!("File: {}", preview.file_path);
+                    println!("Format: {}", format);
+                    println!("Columns: {}", preview.column_count);
+                    println!("Keys: {:?}", preview.keys);
+                    println!("Time Taken: {:.4} seconds", elapsed);
+                    println!("Dry run complete. Full profiling was skipped.");
+                }
+                Err(e) => {
+                    eprintln!("Error during dry run: {}", e);
+                    std::process::exit(1);
+                }
+            },
             _ => {
                 eprintln!("Unsupported format: {}", format);
                 std::process::exit(1);
@@ -131,58 +150,103 @@ fn main() {
                     println!();
                 }
 
-                println!("Column Stats:");
-                for col in profile.columns {
-                    let avg_length = if col.non_null_count > 0 {
-                        col.total_length as f64 / col.non_null_count as f64
-                    } else {
-                        0.0
-                    };
-
-                    match col.inferred_type {
-                        InferredType::Integer | InferredType::Float => {
-                            println!(
-                                "{} -> type: {}, nulls: {}, total: {}, min: {}, max: {}",
-                                col.name,
-                                display_type(&col.inferred_type),
-                                col.null_count,
-                                col.total_count,
-                                format_optional_f64(col.numeric_min),
-                                format_optional_f64(col.numeric_max)
-                            );
-                        }
-                        InferredType::String | InferredType::Mixed => {
-                            println!(
-                                "{} -> type: {}, nulls: {}, total: {}, min_len: {}, max_len: {}, avg_len: {:.2}",
-                                col.name,
-                                display_type(&col.inferred_type),
-                                col.null_count,
-                                col.total_count,
-                                format_optional_usize(col.min_length),
-                                format_optional_usize(col.max_length),
-                                avg_length
-                            );
-                        }
-                        _ => {
-                            println!(
-                                "{} -> type: {}, nulls: {}, total: {}",
-                                col.name,
-                                display_type(&col.inferred_type),
-                                col.null_count,
-                                col.total_count
-                            );
-                        }
-                    }
-                }
+                print_column_stats(profile.columns);
             }
             Err(e) => {
                 eprintln!("Error profiling CSV: {}", e);
                 std::process::exit(1);
             }
         },
+        "json" | "jsonl" | "ndjson" => match profile_json(&file_path) {
+            Ok(profile) => {
+                info!("JSON profiling completed successfully");
+
+                let valid_row_count = profile.row_count.saturating_sub(profile.malformed_row_count);
+                let average_row_width = if valid_row_count > 0 {
+                    profile.total_row_width as f64 / valid_row_count as f64
+                } else {
+                    0.0
+                };
+
+                let elapsed = start_time.elapsed().as_secs_f64();
+
+                println!("JSON Profile Summary");
+                println!("--------------------");
+                println!("File: {}", profile.file_path);
+                println!("Format: {}", format);
+                println!("Rows: {}", profile.row_count);
+                println!("Columns: {}", profile.column_count);
+                println!("Malformed Rows: {}", profile.malformed_row_count);
+                println!("Average Row Width: {:.2} characters", average_row_width);
+                println!("Time Taken: {:.4} seconds", elapsed);
+                println!();
+
+                if !profile.malformed_rows.is_empty() {
+                    warn!("Malformed JSON records detected: {}", profile.malformed_row_count);
+
+                    println!("Malformed Record Details:");
+                    for row_num in &profile.malformed_rows {
+                        println!("record {} -> invalid JSON object structure", row_num);
+                    }
+                    println!();
+                }
+
+                print_column_stats(profile.columns);
+            }
+            Err(e) => {
+                eprintln!("Error profiling JSON: {}", e);
+                std::process::exit(1);
+            }
+        },
         _ => {
             eprintln!("Unsupported format: {}", format);
             std::process::exit(1);
+        }
+    }
+}
+
+fn print_column_stats(columns: Vec<types::ColumnProfile>) {
+    println!("Column Stats:");
+    for col in columns {
+        let avg_length = if col.non_null_count > 0 {
+            col.total_length as f64 / col.non_null_count as f64
+        } else {
+            0.0
+        };
+
+        match col.inferred_type {
+            InferredType::Integer | InferredType::Float => {
+                println!(
+                    "{} -> type: {}, nulls: {}, total: {}, min: {}, max: {}",
+                    col.name,
+                    display_type(&col.inferred_type),
+                    col.null_count,
+                    col.total_count,
+                    format_optional_f64(col.numeric_min),
+                    format_optional_f64(col.numeric_max)
+                );
+            }
+            InferredType::String | InferredType::Mixed => {
+                println!(
+                    "{} -> type: {}, nulls: {}, total: {}, min_len: {}, max_len: {}, avg_len: {:.2}",
+                    col.name,
+                    display_type(&col.inferred_type),
+                    col.null_count,
+                    col.total_count,
+                    format_optional_usize(col.min_length),
+                    format_optional_usize(col.max_length),
+                    avg_length
+                );
+            }
+            _ => {
+                println!(
+                    "{} -> type: {}, nulls: {}, total: {}",
+                    col.name,
+                    display_type(&col.inferred_type),
+                    col.null_count,
+                    col.total_count
+                );
+            }
         }
     }
 }
