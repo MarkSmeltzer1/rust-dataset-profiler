@@ -4,6 +4,8 @@ mod logging;
 mod readers;
 mod types;
 
+use std::time::Instant;
+
 use clap::Parser;
 use cli::Cli;
 use config::{load_config, AppConfig};
@@ -12,6 +14,8 @@ use tracing::{info, warn};
 use types::InferredType;
 
 fn main() {
+    let start_time = Instant::now();
+
     let args = Cli::parse();
 
     let file_path = args.file.clone();
@@ -62,6 +66,8 @@ fn main() {
         match format.as_str() {
             "csv" => match preview_csv(&file_path, delimiter as u8) {
                 Ok(preview) => {
+                    let elapsed = start_time.elapsed().as_secs_f64();
+
                     println!("Dataset Profiler Dry Run");
                     println!("------------------------");
                     println!("File: {}", preview.file_path);
@@ -69,6 +75,7 @@ fn main() {
                     println!("Delimiter: {}", delimiter);
                     println!("Columns: {}", preview.column_count);
                     println!("Headers: {:?}", preview.headers);
+                    println!("Time Taken: {:.4} seconds", elapsed);
                     println!("Dry run complete. Full profiling was skipped.");
                 }
                 Err(e) => {
@@ -90,6 +97,15 @@ fn main() {
             Ok(profile) => {
                 info!("CSV profiling completed successfully");
 
+                let valid_row_count = profile.row_count.saturating_sub(profile.malformed_row_count);
+                let average_row_width = if valid_row_count > 0 {
+                    profile.total_row_width as f64 / valid_row_count as f64
+                } else {
+                    0.0
+                };
+
+                let elapsed = start_time.elapsed().as_secs_f64();
+
                 println!("CSV Profile Summary");
                 println!("-------------------");
                 println!("File: {}", profile.file_path);
@@ -98,6 +114,8 @@ fn main() {
                 println!("Rows: {}", profile.row_count);
                 println!("Columns: {}", profile.column_count);
                 println!("Malformed Rows: {}", profile.malformed_row_count);
+                println!("Average Row Width: {:.2} characters", average_row_width);
+                println!("Time Taken: {:.4} seconds", elapsed);
                 println!();
 
                 if !profile.malformed_rows.is_empty() {

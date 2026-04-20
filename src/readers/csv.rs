@@ -50,6 +50,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
     let mut row_count = 0usize;
     let mut malformed_row_count = 0usize;
     let mut malformed_rows: Vec<MalformedRowInfo> = Vec::new();
+    let mut total_row_width = 0usize;
 
     info!("Detected {} columns", column_count);
 
@@ -82,6 +83,9 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
             });
             continue;
         }
+
+        let row_width: usize = record.iter().map(|field| field.trim().len()).sum();
+        total_row_width += row_width;
 
         for (i, field) in record.iter().enumerate() {
             columns[i].total_count += 1;
@@ -136,6 +140,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
         malformed_row_count,
         malformed_rows,
         columns,
+        total_row_width,
     })
 }
 

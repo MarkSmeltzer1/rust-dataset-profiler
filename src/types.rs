@@ -39,6 +39,7 @@ pub struct CsvProfile {
     pub malformed_row_count: usize,
     pub malformed_rows: Vec<MalformedRowInfo>,
     pub columns: Vec<ColumnProfile>,
+    pub total_row_width: usize,
 }
 
 #[derive(Debug)]
