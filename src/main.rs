@@ -11,6 +11,7 @@ use cli::Cli;
 use config::{load_config, AppConfig};
 use readers::csv::{preview_csv, profile_csv};
 use readers::json::{preview_json, profile_json};
+use readers::parquet::{preview_parquet, profile_parquet};
 use tracing::{info, warn};
 use types::InferredType;
 
@@ -94,6 +95,24 @@ fn main() {
                     println!("Format: {}", format);
                     println!("Columns: {}", preview.column_count);
                     println!("Keys: {:?}", preview.keys);
+                    println!("Time Taken: {:.4} seconds", elapsed);
+                    println!("Dry run complete. Full profiling was skipped.");
+                }
+                Err(e) => {
+                    eprintln!("Error during dry run: {}", e);
+                    std::process::exit(1);
+                }
+            },
+            "parquet" => match preview_parquet(&file_path) {
+                Ok(preview) => {
+                    let elapsed = start_time.elapsed().as_secs_f64();
+
+                    println!("Dataset Profiler Dry Run");
+                    println!("------------------------");
+                    println!("File: {}", preview.file_path);
+                    println!("Format: parquet");
+                    println!("Columns: {}", preview.column_count);
+                    println!("Columns/Fields: {:?}", preview.columns);
                     println!("Time Taken: {:.4} seconds", elapsed);
                     println!("Dry run complete. Full profiling was skipped.");
                 }
@@ -195,6 +214,35 @@ fn main() {
             }
             Err(e) => {
                 eprintln!("Error profiling JSON: {}", e);
+                std::process::exit(1);
+            }
+        },
+        "parquet" => match profile_parquet(&file_path) {
+            Ok(profile) => {
+                info!("Parquet profiling completed successfully");
+
+                let average_row_width = if profile.row_count > 0 {
+                    profile.total_row_width as f64 / profile.row_count as f64
+                } else {
+                    0.0
+                };
+
+                let elapsed = start_time.elapsed().as_secs_f64();
+
+                println!("Parquet Profile Summary");
+                println!("-----------------------");
+                println!("File: {}", profile.file_path);
+                println!("Format: parquet");
+                println!("Rows: {}", profile.row_count);
+                println!("Columns: {}", profile.column_count);
+                println!("Average Row Width: {:.2} characters", average_row_width);
+                println!("Time Taken: {:.4} seconds", elapsed);
+                println!();
+
+                print_column_stats(profile.columns);
+            }
+            Err(e) => {
+                eprintln!("Error profiling Parquet: {}", e);
                 std::process::exit(1);
             }
         },

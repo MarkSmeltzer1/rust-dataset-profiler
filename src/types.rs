@@ -66,3 +66,19 @@ pub struct JsonPreview {
     pub column_count: usize,
     pub keys: Vec<String>,
 }
+
+#[derive(Debug)]
+pub struct ParquetProfile {
+    pub file_path: String,
+    pub row_count: usize,
+    pub column_count: usize,
+    pub columns: Vec<ColumnProfile>,
+    pub total_row_width: usize,
+}
+
+#[derive(Debug)]
+pub struct ParquetPreview {
+    pub file_path: String,
+    pub column_count: usize,
+    pub columns: Vec<String>,
+}
