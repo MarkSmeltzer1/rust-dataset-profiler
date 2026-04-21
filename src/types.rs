@@ -17,6 +17,8 @@ pub struct ColumnProfile {
 
     pub numeric_min: Option<f64>,
     pub numeric_max: Option<f64>,
+    pub numeric_sum: f64,
+    pub numeric_count: usize,
 
     pub min_length: Option<usize>,
     pub max_length: Option<usize>,

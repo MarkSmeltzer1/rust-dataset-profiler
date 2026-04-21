@@ -13,7 +13,7 @@ use readers::csv::{preview_csv, profile_csv};
 use readers::json::{preview_json, profile_json};
 use readers::parquet::{preview_parquet, profile_parquet};
 use tracing::{info, warn};
-use types::InferredType;
+use types::{ColumnProfile, InferredType};
 
 fn main() {
     let start_time = Instant::now();
@@ -169,7 +169,8 @@ fn main() {
                     println!();
                 }
 
-                print_column_stats(profile.columns);
+                print_column_stats(&profile.columns);
+                print_column_warnings(&profile.columns);
             }
             Err(e) => {
                 eprintln!("Error profiling CSV: {}", e);
@@ -210,7 +211,8 @@ fn main() {
                     println!();
                 }
 
-                print_column_stats(profile.columns);
+                print_column_stats(&profile.columns);
+                print_column_warnings(&profile.columns);
             }
             Err(e) => {
                 eprintln!("Error profiling JSON: {}", e);
@@ -239,7 +241,8 @@ fn main() {
                 println!("Time Taken: {:.4} seconds", elapsed);
                 println!();
 
-                print_column_stats(profile.columns);
+                print_column_stats(&profile.columns);
+                print_column_warnings(&profile.columns);
             }
             Err(e) => {
                 eprintln!("Error profiling Parquet: {}", e);
@@ -253,7 +256,7 @@ fn main() {
     }
 }
 
-fn print_column_stats(columns: Vec<types::ColumnProfile>) {
+fn print_column_stats(columns: &[ColumnProfile]) {
     println!("Column Stats:");
     for col in columns {
         let avg_length = if col.non_null_count > 0 {
@@ -262,24 +265,39 @@ fn print_column_stats(columns: Vec<types::ColumnProfile>) {
             0.0
         };
 
+        let null_pct = if col.total_count > 0 {
+            (col.null_count as f64 / col.total_count as f64) * 100.0
+        } else {
+            0.0
+        };
+
         match col.inferred_type {
             InferredType::Integer | InferredType::Float => {
+                let mean = if col.numeric_count > 0 {
+                    col.numeric_sum / col.numeric_count as f64
+                } else {
+                    0.0
+                };
+
                 println!(
-                    "{} -> type: {}, nulls: {}, total: {}, min: {}, max: {}",
+                    "{} -> type: {}, nulls: {} ({:.2}%), total: {}, min: {}, max: {}, mean: {:.2}",
                     col.name,
                     display_type(&col.inferred_type),
                     col.null_count,
+                    null_pct,
                     col.total_count,
                     format_optional_f64(col.numeric_min),
-                    format_optional_f64(col.numeric_max)
+                    format_optional_f64(col.numeric_max),
+                    mean
                 );
             }
             InferredType::String | InferredType::Mixed => {
                 println!(
-                    "{} -> type: {}, nulls: {}, total: {}, min_len: {}, max_len: {}, avg_len: {:.2}",
+                    "{} -> type: {}, nulls: {} ({:.2}%), total: {}, min_len: {}, max_len: {}, avg_len: {:.2}",
                     col.name,
                     display_type(&col.inferred_type),
                     col.null_count,
+                    null_pct,
                     col.total_count,
                     format_optional_usize(col.min_length),
                     format_optional_usize(col.max_length),
@@ -288,13 +306,76 @@ fn print_column_stats(columns: Vec<types::ColumnProfile>) {
             }
             _ => {
                 println!(
-                    "{} -> type: {}, nulls: {}, total: {}",
+                    "{} -> type: {}, nulls: {} ({:.2}%), total: {}",
                     col.name,
                     display_type(&col.inferred_type),
                     col.null_count,
+                    null_pct,
                     col.total_count
                 );
             }
+        }
+    }
+}
+
+fn print_column_warnings(columns: &[ColumnProfile]) {
+    let mut warnings = Vec::new();
+
+    for col in columns {
+        let null_pct = if col.total_count > 0 {
+            (col.null_count as f64 / col.total_count as f64) * 100.0
+        } else {
+            0.0
+        };
+
+        if null_pct >= 50.0 {
+            warnings.push(format!(
+                "{} -> high missingness ({:.2}% null)",
+                col.name, null_pct
+            ));
+        } else if null_pct >= 20.0 {
+            warnings.push(format!(
+                "{} -> moderate missingness ({:.2}% null)",
+                col.name, null_pct
+            ));
+        }
+
+        if matches!(col.inferred_type, InferredType::Mixed) {
+            warnings.push(format!(
+                "{} -> mixed or complex type detected",
+                col.name
+            ));
+        }
+
+        if let (Some(min), Some(max)) = (col.numeric_min, col.numeric_max) {
+            if (max - min).abs() < f64::EPSILON && col.numeric_count > 0 {
+                warnings.push(format!(
+                    "{} -> constant numeric values detected",
+                    col.name
+                ));
+            }
+
+            if min < 0.0 {
+                warnings.push(format!(
+                    "{} -> negative numeric values present (min: {:.2})",
+                    col.name, min
+                ));
+            }
+
+            if max.abs() > 1_000_000.0 || min.abs() > 1_000_000.0 {
+                warnings.push(format!(
+                    "{} -> extreme numeric range detected (min: {:.2}, max: {:.2})",
+                    col.name, min, max
+                ));
+            }
+        }
+    }
+
+    if !warnings.is_empty() {
+        println!();
+        println!("Column Warnings:");
+        for warning in warnings {
+            println!("- {}", warning);
         }
     }
 }

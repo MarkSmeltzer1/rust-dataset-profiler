@@ -63,6 +63,8 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
             inferred_type: InferredType::Unknown,
             numeric_min: None,
             numeric_max: None,
+            numeric_sum: 0.0,
+            numeric_count: 0,
             min_length: None,
             max_length: None,
             total_length: 0,
@@ -126,6 +128,9 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
                     Some(current) => current.max(value),
                     None => value,
                 });
+
+                columns[i].numeric_sum += value;
+                columns[i].numeric_count += 1;
             }
         }
     }

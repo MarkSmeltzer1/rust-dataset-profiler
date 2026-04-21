@@ -59,6 +59,8 @@ pub fn profile_parquet(file_path: &str) -> Result<ParquetProfile, Box<dyn Error>
             inferred_type: InferredType::Unknown,
             numeric_min: None,
             numeric_max: None,
+            numeric_sum: 0.0,
+            numeric_count: 0,
             min_length: None,
             max_length: None,
             total_length: 0,
@@ -107,6 +109,9 @@ pub fn profile_parquet(file_path: &str) -> Result<ParquetProfile, Box<dyn Error>
                             Some(current) => current.max(num),
                             None => num,
                         });
+
+                        col.numeric_sum += num;
+                        col.numeric_count += 1;
                     }
                 }
             }

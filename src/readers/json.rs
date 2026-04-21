@@ -58,6 +58,8 @@ pub fn profile_json(file_path: &str) -> Result<JsonProfile, Box<dyn Error>> {
             inferred_type: InferredType::Unknown,
             numeric_min: None,
             numeric_max: None,
+            numeric_sum: 0.0,
+            numeric_count: 0,
             min_length: None,
             max_length: None,
             total_length: 0,
@@ -119,6 +121,9 @@ pub fn profile_json(file_path: &str) -> Result<JsonProfile, Box<dyn Error>> {
                             Some(current) => current.max(v),
                             None => v,
                         });
+
+                        columns[col_idx].numeric_sum += v;
+                        columns[col_idx].numeric_count += 1;
 
                         let len = num.to_string().len();
                         row_width += len;
