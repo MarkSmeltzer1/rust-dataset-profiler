@@ -6,6 +6,8 @@ use tracing::info;
 
 use crate::types::{ColumnProfile, CsvPreview, CsvProfile, InferredType, MalformedRowInfo};
 
+const PROGRESS_INTERVAL_ROWS: usize = 100_000;
+
 pub fn preview_csv(file_path: &str, delimiter: u8) -> Result<CsvPreview, Box<dyn Error>> {
     info!("Opening CSV file for dry run: {}", file_path);
 
@@ -76,6 +78,10 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
         let record: StringRecord = result?;
         row_count += 1;
 
+        if row_count % PROGRESS_INTERVAL_ROWS == 0 {
+            info!("CSV progress: {} rows processed", row_count);
+        }
+
         if record.len() != column_count {
             malformed_row_count += 1;
             malformed_rows.push(MalformedRowInfo {
@@ -115,8 +121,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
             });
 
             let field_type = infer_field_type(trimmed);
-            columns[i].inferred_type =
-                merge_inferred_types(&columns[i].inferred_type, &field_type);
+            columns[i].inferred_type = merge_inferred_types(&columns[i].inferred_type, &field_type);
 
             if let Ok(value) = trimmed.parse::<f64>() {
                 columns[i].numeric_min = Some(match columns[i].numeric_min {

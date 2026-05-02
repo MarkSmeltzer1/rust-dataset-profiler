@@ -65,6 +65,7 @@ This reduces manual inspection and speeds up dataset onboarding.
 * `--config` TOML configuration file
 * `--verbose` structured logging
 * `--dry-run` preview mode
+* `--threads` thread setting for future parallel readers
 * built-in `--help`
 * built-in `--version`
 
@@ -161,6 +162,18 @@ without full profiling.
 cargo run -- --file test.csv --verbose
 ```
 
+Verbose mode also logs progress every 100,000 rows for large CSV, JSON, and Parquet profiles.
+
+---
+
+### Thread Setting
+
+```bash
+cargo run -- --file test.csv --threads 2
+```
+
+The current readers are primarily streaming and single-threaded. The flag is validated and logged so the CLI is ready for future parallel profiling work.
+
 ---
 
 ### Config File Usage
@@ -172,6 +185,16 @@ cargo run -- --file test.csv --config config.toml
 ```
 
 CLI arguments override config values.
+
+Example config:
+
+```toml
+format = "csv"
+delimiter = ","
+verbose = false
+dry_run = false
+threads = 1
+```
 
 ---
 
@@ -215,9 +238,12 @@ tests/
 
 * Uses structured logging (`tracing`)
 * Supports verbose mode
+* Logs file open, format selection, profiling start/end, malformed rows, column warnings, and large-file progress
 * Provides clear error messages for:
 
   * invalid files
+  * invalid arguments
+  * invalid config files
   * parsing issues
   * unsupported formats
 * Designed to fail gracefully with meaningful output

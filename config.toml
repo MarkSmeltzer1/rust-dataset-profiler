@@ -2,3 +2,4 @@ format = "csv"
 delimiter = ","
 verbose = false
 dry_run = false
+threads = 1
