@@ -113,6 +113,31 @@ cargo run -- --file <path_to_file>
 
 ---
 
+### Example Output
+
+```text
+CSV Profile Summary
+-------------------
+File: test.csv
+Format: csv
+Delimiter: ,
+Rows: 3
+Columns: 3
+Malformed Rows: 0
+Average Row Width: 5.67 characters
+Time Taken: 0.0417 seconds
+
+Column Stats:
+id -> type: integer, nulls: 0 (0.00%), total: 3, min: 1.00, max: 3.00, mean: 2.00
+name -> type: string, nulls: 1 (33.33%), total: 3, min_len: 3, max_len: 5, avg_len: 4.00
+age -> type: integer, nulls: 0 (0.00%), total: 3, min: 22.00, max: 30.00, mean: 25.67
+
+Column Warnings:
+- name -> moderate missingness (33.33% null)
+```
+
+---
+
 ### Examples
 
 #### CSV
@@ -243,23 +268,51 @@ CSV is faster here because the reader streams records row by row with low parsin
 src/
   main.rs        -> CLI entry point and application flow
   lib.rs         -> reusable crate modules for tests and benchmarks
-  cli.rs         → CLI argument parsing
-  config.rs      → config file handling
+  cli.rs         -> CLI argument parsing
+  config.rs      -> config file handling
   errors.rs      -> custom error types and fatal exit helper
-  logging.rs     → logging setup
-  types.rs       → shared data structures
+  logging.rs     -> logging setup
+  types.rs       -> shared data structures
   readers/
-    csv.rs       → CSV profiling
-    json.rs      → JSON profiling
-    parquet.rs   → Parquet profiling
+    csv.rs       -> CSV profiling
+    json.rs      -> JSON profiling
+    parquet.rs   -> Parquet profiling
 
 tests/
-  cli_error_tests.rs → CLI and error behavior tests
-  profile_tests.rs → integration tests
+  cli_error_tests.rs -> CLI and error behavior tests
+  profile_tests.rs   -> integration tests
 
 benches/
-  profile_benchmarks.rs → Criterion performance benchmarks
+  profile_benchmarks.rs -> Criterion performance benchmarks
 ```
+
+---
+
+## How It Works
+
+1. `main.rs` parses CLI arguments with `clap`.
+2. If `--config` is provided, `config.rs` loads TOML settings.
+3. CLI values override config values.
+4. `logging.rs` initializes structured logging based on `--verbose` or config.
+5. `main.rs` validates the file path, format, and thread count.
+6. The correct reader in `src/readers/` previews or profiles the file.
+7. Reader modules fill shared structs from `types.rs`.
+8. `main.rs` prints the final summary, column stats, warnings, and runtime.
+
+---
+
+## Warning Rules
+
+Column warnings are heuristic checks meant to flag data that may need review:
+
+* moderate missingness: at least 20% null values
+* high missingness: at least 50% null values
+* mixed or complex type: values do not fit one simple inferred type
+* constant numeric column: all observed numeric values are the same
+* negative values: numeric minimum is below zero
+* extreme numeric range: absolute minimum or maximum is above 1,000,000
+
+Warnings do not always mean the data is wrong. They are prompts for investigation before building a pipeline.
 
 ---
 
@@ -297,6 +350,16 @@ Processed row-by-row to avoid loading entire file into memory.
 
 ---
 
+## Limitations
+
+* Standard JSON arrays are parsed in memory; NDJSON is preferred for large JSON datasets.
+* `--threads` is currently validated and logged, but the readers are mostly single-threaded.
+* Parquet profiling uses the row-based API, which is simpler but not as optimized as Arrow batch processing.
+* Type inference is heuristic-based and may classify timestamps or nested structures as mixed.
+* Benchmarks are local measurements and can vary by machine.
+
+---
+
 ## Current Status
 
 Completed:
@@ -307,17 +370,19 @@ Completed:
 * CLI interface
 * Config support
 * Structured logging
-* Initial test suite
+* Edge-case and CLI test coverage
+* Criterion benchmark setup
+* Progress logging for large datasets
+* Thread-count flag and validation
 
 ---
 
 ## Work In Progress
 
-* Additional edge-case tests
-* Benchmarking
-* Threading support (`--threads`)
-* Progress tracking for large datasets
-* Documentation improvements
+* Optional Parquet fixture tests
+* Potential Arrow-based Parquet optimization
+* Real parallel profiling implementation behind `--threads`
+* Final README polish before submission
 
 ---
 
