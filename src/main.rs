@@ -1,21 +1,15 @@
-mod cli;
-mod config;
-mod errors;
-mod logging;
-mod readers;
-mod types;
-
 use std::path::Path;
 use std::time::Instant;
 
 use clap::Parser;
-use cli::Cli;
-use config::{load_config, AppConfig};
-use errors::{fatal, ProfilerError};
-use readers::csv::{preview_csv, profile_csv};
-use readers::json::{preview_json, profile_json};
-use readers::parquet::{preview_parquet, profile_parquet};
-use types::{ColumnProfile, InferredType};
+use dataset_profiler::cli::Cli;
+use dataset_profiler::config::{load_config, AppConfig};
+use dataset_profiler::errors::{fatal, ProfilerError};
+use dataset_profiler::logging;
+use dataset_profiler::readers::csv::{preview_csv, profile_csv};
+use dataset_profiler::readers::json::{preview_json, profile_json};
+use dataset_profiler::readers::parquet::{preview_parquet, profile_parquet};
+use dataset_profiler::types::{ColumnProfile, InferredType};
 
 fn main() {
     let start_time = Instant::now();

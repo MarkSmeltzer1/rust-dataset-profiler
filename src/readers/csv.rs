@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::fs::File;
+use std::io::{Error as IoError, ErrorKind};
 
 use csv::StringRecord;
 use tracing::info;
@@ -23,6 +24,10 @@ pub fn preview_csv(file_path: &str, delimiter: u8) -> Result<CsvPreview, Box<dyn
         .collect::<Vec<String>>();
 
     let column_count = headers.len();
+
+    if column_count == 0 {
+        return Err(IoError::new(ErrorKind::InvalidData, "CSV file has no headers").into());
+    }
 
     info!("Dry run found {} columns", column_count);
 
@@ -49,6 +54,11 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
         .collect::<Vec<String>>();
 
     let column_count = headers.len();
+
+    if column_count == 0 {
+        return Err(IoError::new(ErrorKind::InvalidData, "CSV file has no headers").into());
+    }
+
     let mut row_count = 0usize;
     let mut malformed_row_count = 0usize;
     let mut malformed_rows: Vec<MalformedRowInfo> = Vec::new();

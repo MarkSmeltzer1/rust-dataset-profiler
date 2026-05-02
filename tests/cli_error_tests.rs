@@ -142,3 +142,41 @@ dry_run = false
 
     let _ = fs::remove_file(config_path);
 }
+
+#[test]
+fn cli_format_overrides_config_format() {
+    let config_path = std::env::temp_dir().join("dprofile_format_override_config.toml");
+    fs::write(
+        &config_path,
+        r#"
+format = "json"
+delimiter = ","
+verbose = false
+dry_run = false
+threads = 1
+"#,
+    )
+    .expect("test config should be written");
+
+    let output = dprofile_command()
+        .args([
+            "--file",
+            "test.csv",
+            "--config",
+            config_path
+                .to_str()
+                .expect("temp path should be valid UTF-8"),
+            "--format",
+            "csv",
+        ])
+        .output()
+        .expect("command should run");
+
+    assert!(output.status.success());
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("CSV Profile Summary"));
+    assert!(stdout.contains("Format: csv"));
+
+    let _ = fs::remove_file(config_path);
+}
