@@ -9,6 +9,8 @@ use tracing::info;
 
 use crate::types::{ColumnProfile, InferredType, JsonPreview, JsonProfile};
 
+const PROGRESS_INTERVAL_ROWS: usize = 100_000;
+
 pub fn preview_json(file_path: &str) -> Result<JsonPreview, Box<dyn Error>> {
     info!("Opening JSON file for dry run: {}", file_path);
 
@@ -80,6 +82,10 @@ pub fn profile_json(file_path: &str) -> Result<JsonProfile, Box<dyn Error>> {
 
     for (row_idx, record) in records.iter().enumerate() {
         row_count += 1;
+
+        if row_count % PROGRESS_INTERVAL_ROWS == 0 {
+            info!("JSON progress: {} rows processed", row_count);
+        }
 
         let obj = match record {
             Value::Object(map) => map,
