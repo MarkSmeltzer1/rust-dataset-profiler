@@ -377,12 +377,25 @@ Completed:
 
 ---
 
-## Work In Progress
+## Rubric Alignment
+
+This project now addresses the main production-ready rubric categories:
+
+* CLI and UX: help/version support, validation, config overrides, dry-run, verbose mode, and thread flag
+* Implementation: CSV, JSON/NDJSON, and Parquet profiling with streaming where practical
+* Data engineering thinking: schema shape, type hints, null patterns, malformed rows, average row width, and quality warnings
+* Logging and observability: structured logs, warning/error levels, progress logging, row counts, and runtime summaries
+* Testing: core profiling tests, CLI error tests, config behavior tests, and edge-case tests
+* Benchmarking: Criterion benchmarks for CSV and JSON profiling
+* Documentation: usage, examples, architecture, warning rules, benchmark results, limitations, and trade-offs
+
+---
+
+## Remaining Improvements
 
 * Optional Parquet fixture tests
 * Potential Arrow-based Parquet optimization
 * Real parallel profiling implementation behind `--threads`
-* Final README polish before submission
 
 ---
 
