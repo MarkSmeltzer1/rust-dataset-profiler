@@ -264,6 +264,29 @@ CSV is faster here because the reader streams records row by row with low parsin
 
 ---
 
+## Running Benchmarks
+
+Run Criterion benchmarks:
+
+```bash
+cargo bench
+```
+
+The benchmark suite profiles generated CSV and JSON fixtures at small and medium sizes. Results are written under `target/criterion/`.
+
+Example local results from a short Criterion run:
+
+| Benchmark | Approximate Time |
+| --- | ---: |
+| CSV, 100 rows | 68-95 microseconds |
+| CSV, 10,000 rows | 4.1-5.3 milliseconds |
+| JSON, 100 rows | 179-246 microseconds |
+| JSON, 10,000 rows | 22.9-28.1 milliseconds |
+
+CSV is faster here because the reader streams records row by row with low parsing overhead. JSON arrays currently require parsing the full document structure before profiling, which is simpler but less memory-efficient for very large array-style JSON files.
+
+---
+
 ## Project Structure
 
 ```text
