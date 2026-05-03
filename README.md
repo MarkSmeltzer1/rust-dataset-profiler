@@ -266,6 +266,30 @@ CSV is faster here because the reader streams records row by row with low parsin
 
 ---
 
+## Manual Large-File Validation
+
+The profiler was also tested manually against larger local datasets in release mode. These files are not committed to the repository because they are user data, not application code.
+
+| File | Format | Rows | Columns | Malformed Rows | Average Row Width | Time Taken | Result |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `ratings.csv` | CSV | 32,000,204 | 4 | 0 | 22.41 chars | 33.3160s | Completed |
+| `ratings_1m.jsonl` | JSONL / NDJSON | 1,000,000 | 4 | 0 | 20.78 chars | 5.0926s | Completed |
+| `yellow_tripdata_2025-01.parquet` | Parquet | 3,475,226 | 20 | N/A | 103.99 chars | 15.9120s | Completed |
+
+Validation commands:
+
+```bash
+cargo run --release -- --file ratings.csv --verbose
+cargo run --release -- --file ratings_1m.jsonl --verbose
+cargo run --release -- --file yellow_tripdata_2025-01.parquet --verbose
+```
+
+The JSONL file was generated locally from the ratings CSV to test large NDJSON-style processing. It is intentionally ignored by Git along with other local `*.csv`, `*.json`, `*.jsonl`, and `*.parquet` data files.
+
+Observed warnings were useful but context-dependent. For example, Unix timestamp columns were flagged for extreme numeric ranges, taxi fare columns with refunds or adjustments were flagged for negative values, and Parquet timestamp fields were classified as mixed because logical timestamp handling is still heuristic-based.
+
+---
+
 ## Project Structure
 
 ```text
