@@ -1,10 +1,13 @@
 use std::error::Error;
 use std::fs::File;
+use std::io::{Error as IoError, ErrorKind};
 
 use csv::StringRecord;
 use tracing::info;
 
 use crate::types::{ColumnProfile, CsvPreview, CsvProfile, InferredType, MalformedRowInfo};
+
+const PROGRESS_INTERVAL_ROWS: usize = 100_000;
 
 pub fn preview_csv(file_path: &str, delimiter: u8) -> Result<CsvPreview, Box<dyn Error>> {
     info!("Opening CSV file for dry run: {}", file_path);
@@ -21,6 +24,10 @@ pub fn preview_csv(file_path: &str, delimiter: u8) -> Result<CsvPreview, Box<dyn
         .collect::<Vec<String>>();
 
     let column_count = headers.len();
+
+    if column_count == 0 {
+        return Err(IoError::new(ErrorKind::InvalidData, "CSV file has no headers").into());
+    }
 
     info!("Dry run found {} columns", column_count);
 
@@ -47,6 +54,11 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
         .collect::<Vec<String>>();
 
     let column_count = headers.len();
+
+    if column_count == 0 {
+        return Err(IoError::new(ErrorKind::InvalidData, "CSV file has no headers").into());
+    }
+
     let mut row_count = 0usize;
     let mut malformed_row_count = 0usize;
     let mut malformed_rows: Vec<MalformedRowInfo> = Vec::new();
@@ -75,6 +87,10 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
     for result in reader.records() {
         let record: StringRecord = result?;
         row_count += 1;
+
+        if row_count.is_multiple_of(PROGRESS_INTERVAL_ROWS) {
+            info!("CSV progress: {} rows processed", row_count);
+        }
 
         if record.len() != column_count {
             malformed_row_count += 1;
@@ -115,8 +131,7 @@ pub fn profile_csv(file_path: &str, delimiter: u8) -> Result<CsvProfile, Box<dyn
             });
 
             let field_type = infer_field_type(trimmed);
-            columns[i].inferred_type =
-                merge_inferred_types(&columns[i].inferred_type, &field_type);
+            columns[i].inferred_type = merge_inferred_types(&columns[i].inferred_type, &field_type);
 
             if let Ok(value) = trimmed.parse::<f64>() {
                 columns[i].numeric_min = Some(match columns[i].numeric_min {

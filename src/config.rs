@@ -8,6 +8,7 @@ pub struct AppConfig {
     pub delimiter: Option<char>,
     pub verbose: Option<bool>,
     pub dry_run: Option<bool>,
+    pub threads: Option<usize>,
 }
 
 pub fn load_config(path: &str) -> Result<AppConfig, Box<dyn Error>> {

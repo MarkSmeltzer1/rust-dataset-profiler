@@ -31,3 +31,7 @@ indicatif = "0.18"
 
 [dev-dependencies]
 criterion = "0.8"
+
+[[bench]]
+name = "profile_benchmarks"
+harness = false
