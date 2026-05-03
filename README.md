@@ -111,6 +111,8 @@ cargo build
 cargo run -- --file <path_to_file>
 ```
 
+Users provide their own input files when running the CLI. Dataset files are not stored in this repository because CSV, JSON, JSONL, and Parquet files are user data rather than application code.
+
 ---
 
 ### Example Output
@@ -143,19 +145,19 @@ Column Warnings:
 #### CSV
 
 ```bash
-cargo run -- --file test.csv
+cargo run -- --file sales.csv
 ```
 
 #### JSON
 
 ```bash
-cargo run -- --file test.json
+cargo run -- --file events.json
 ```
 
 #### JSONL / NDJSON
 
 ```bash
-cargo run -- --file test.jsonl
+cargo run -- --file events.jsonl
 ```
 
 #### Parquet
@@ -169,7 +171,7 @@ cargo run -- --file your_file.parquet
 ### Dry Run (Preview Only)
 
 ```bash
-cargo run -- --file test.csv --dry-run
+cargo run -- --file sales.csv --dry-run
 ```
 
 This shows:
@@ -184,7 +186,7 @@ without full profiling.
 ### Verbose Logging
 
 ```bash
-cargo run -- --file test.csv --verbose
+cargo run -- --file sales.csv --verbose
 ```
 
 Verbose mode also logs progress every 100,000 rows for large CSV, JSON, and Parquet profiles.
@@ -194,7 +196,7 @@ Verbose mode also logs progress every 100,000 rows for large CSV, JSON, and Parq
 ### Thread Setting
 
 ```bash
-cargo run -- --file test.csv --threads 2
+cargo run -- --file sales.csv --threads 2
 ```
 
 The current readers are primarily streaming and single-threaded. The flag is validated and logged so runs are explicit about the requested thread setting.
@@ -206,7 +208,7 @@ The current readers are primarily streaming and single-threaded. The flag is val
 Example:
 
 ```bash
-cargo run -- --file test.csv --config config.toml
+cargo run -- --file sales.csv --config config.toml
 ```
 
 CLI arguments override config values.
@@ -237,7 +239,7 @@ Run with output:
 cargo test -- --nocapture
 ```
 
-Tests generate their own temporary CSV and JSON fixtures. Local datasets such as `*.csv`, `*.json`, `*.jsonl`, and `*.parquet` are ignored by Git so the repository stays focused on code rather than sample data.
+Tests create tiny temporary CSV, JSON, JSONL, and Parquet files while the test suite runs. Those files are only test fixtures and are not committed. Real datasets such as `*.csv`, `*.json`, `*.jsonl`, and `*.parquet` are ignored by Git so users can keep local data in the project folder without pushing it to GitHub.
 
 ---
 
@@ -259,29 +261,6 @@ Example local results from `cargo bench`:
 | CSV, 10,000 rows | 6.14-6.71 milliseconds |
 | JSON, 100 rows | 145-162 microseconds |
 | JSON, 10,000 rows | 24.0-26.4 milliseconds |
-
-CSV is faster here because the reader streams records row by row with low parsing overhead. JSON arrays currently require parsing the full document structure before profiling, which is simpler but less memory-efficient for very large array-style JSON files.
-
----
-
-## Running Benchmarks
-
-Run Criterion benchmarks:
-
-```bash
-cargo bench
-```
-
-The benchmark suite profiles generated CSV and JSON fixtures at small and medium sizes. Results are written under `target/criterion/`.
-
-Example local results from a short Criterion run:
-
-| Benchmark | Approximate Time |
-| --- | ---: |
-| CSV, 100 rows | 68-95 microseconds |
-| CSV, 10,000 rows | 4.1-5.3 milliseconds |
-| JSON, 100 rows | 179-246 microseconds |
-| JSON, 10,000 rows | 22.9-28.1 milliseconds |
 
 CSV is faster here because the reader streams records row by row with low parsing overhead. JSON arrays currently require parsing the full document structure before profiling, which is simpler but less memory-efficient for very large array-style JSON files.
 
@@ -396,6 +375,7 @@ Completed:
 * Config support
 * Structured logging
 * Edge-case and CLI test coverage
+* Parquet automated test coverage
 * Criterion benchmark setup
 * Progress logging for large datasets
 * Thread-count flag and validation
@@ -410,7 +390,7 @@ This project now addresses the main production-ready rubric categories:
 * Implementation: CSV, JSON/NDJSON, and Parquet profiling with streaming where practical
 * Data engineering thinking: schema shape, type hints, null patterns, malformed rows, average row width, and quality warnings
 * Logging and observability: structured logs, warning/error levels, progress logging, row counts, and runtime summaries
-* Testing: core profiling tests, CLI error tests, config behavior tests, and edge-case tests
+* Testing: core profiling tests, Parquet tests, CLI error tests, config behavior tests, and edge-case tests
 * Benchmarking: Criterion benchmarks for CSV and JSON profiling
 * Documentation: usage, examples, architecture, warning rules, benchmark results, limitations, and trade-offs
 
@@ -418,7 +398,6 @@ This project now addresses the main production-ready rubric categories:
 
 ## Remaining Improvements
 
-* Optional small Parquet fixture tests
 * Potential Arrow-based Parquet optimization
 * Real parallel profiling implementation behind `--threads`
 

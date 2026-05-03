@@ -1,7 +1,13 @@
 use dataset_profiler::readers::csv::{preview_csv, profile_csv};
 use dataset_profiler::readers::json::{preview_json, profile_json};
+use dataset_profiler::readers::parquet::{preview_parquet, profile_parquet};
 use dataset_profiler::types::InferredType;
+use parquet::data_type::{BoolType, ByteArray, ByteArrayType, DoubleType, Int32Type};
+use parquet::file::writer::SerializedFileWriter;
+use parquet::schema::parser::parse_message_type;
 use std::fs;
+use std::fs::File;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn temp_file(name: &str, content: &str) -> String {
@@ -49,6 +55,82 @@ fn basic_jsonl_fixture() -> String {
 {"id":3,"name":null,"age":22}
 "#,
     )
+}
+
+fn basic_parquet_fixture() -> String {
+    let path = temp_file("dprofile_basic.parquet", "");
+    let schema = Arc::new(
+        parse_message_type(
+            "
+            message schema {
+                REQUIRED INT32 id;
+                REQUIRED BYTE_ARRAY name (UTF8);
+                REQUIRED DOUBLE price;
+                REQUIRED BOOLEAN active;
+            }
+            ",
+        )
+        .expect("Parquet schema should parse"),
+    );
+
+    let file = File::create(&path).expect("Parquet fixture should be created");
+    let mut file_writer =
+        SerializedFileWriter::new(file, schema, Default::default()).expect("writer should open");
+    let mut row_group_writer = file_writer
+        .next_row_group()
+        .expect("row group should be created");
+
+    let mut id_writer = row_group_writer
+        .next_column()
+        .expect("column result should exist")
+        .expect("id column should exist");
+    id_writer
+        .typed::<Int32Type>()
+        .write_batch(&[1, 2, 3], None, None)
+        .expect("ids should be written");
+    id_writer.close().expect("id column should close");
+
+    let names = [
+        ByteArray::from("Alice"),
+        ByteArray::from("Bob"),
+        ByteArray::from("Charlie"),
+    ];
+    let mut name_writer = row_group_writer
+        .next_column()
+        .expect("column result should exist")
+        .expect("name column should exist");
+    name_writer
+        .typed::<ByteArrayType>()
+        .write_batch(&names, None, None)
+        .expect("names should be written");
+    name_writer.close().expect("name column should close");
+
+    let mut price_writer = row_group_writer
+        .next_column()
+        .expect("column result should exist")
+        .expect("price column should exist");
+    price_writer
+        .typed::<DoubleType>()
+        .write_batch(&[19.99, 25.50, 10.00], None, None)
+        .expect("prices should be written");
+    price_writer.close().expect("price column should close");
+
+    let mut active_writer = row_group_writer
+        .next_column()
+        .expect("column result should exist")
+        .expect("active column should exist");
+    active_writer
+        .typed::<BoolType>()
+        .write_batch(&[true, false, true], None, None)
+        .expect("active values should be written");
+    active_writer.close().expect("active column should close");
+
+    row_group_writer
+        .close()
+        .expect("row group should close cleanly");
+    file_writer.finish().expect("Parquet file should finish");
+
+    path
 }
 
 #[test]
@@ -231,6 +313,56 @@ fn test_invalid_json_profile_returns_error() {
     let result = profile_json(&path);
 
     assert!(result.is_err());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn test_parquet_preview() {
+    let path = basic_parquet_fixture();
+    let preview = preview_parquet(&path).expect("Parquet preview should succeed");
+
+    assert_eq!(preview.column_count, 4);
+    assert_eq!(preview.columns, vec!["id", "name", "price", "active"]);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn test_parquet_profile_basic() {
+    let path = basic_parquet_fixture();
+    let profile = profile_parquet(&path).expect("Parquet profiling should succeed");
+
+    assert_eq!(profile.row_count, 3);
+    assert_eq!(profile.column_count, 4);
+    assert_eq!(profile.columns.len(), 4);
+    assert!(profile.total_row_width > 0);
+
+    let id_col = profile.columns.iter().find(|c| c.name == "id").unwrap();
+    assert_eq!(id_col.null_count, 0);
+    assert_eq!(id_col.total_count, 3);
+    assert!(matches!(id_col.inferred_type, InferredType::Integer));
+    assert_eq!(id_col.numeric_min, Some(1.0));
+    assert_eq!(id_col.numeric_max, Some(3.0));
+
+    let name_col = profile.columns.iter().find(|c| c.name == "name").unwrap();
+    assert_eq!(name_col.null_count, 0);
+    assert_eq!(name_col.total_count, 3);
+    assert!(matches!(name_col.inferred_type, InferredType::String));
+    assert_eq!(name_col.min_length, Some(3));
+    assert_eq!(name_col.max_length, Some(7));
+
+    let price_col = profile.columns.iter().find(|c| c.name == "price").unwrap();
+    assert_eq!(price_col.null_count, 0);
+    assert_eq!(price_col.total_count, 3);
+    assert!(matches!(price_col.inferred_type, InferredType::Float));
+    assert_eq!(price_col.numeric_min, Some(10.0));
+    assert_eq!(price_col.numeric_max, Some(25.5));
+
+    let active_col = profile.columns.iter().find(|c| c.name == "active").unwrap();
+    assert_eq!(active_col.null_count, 0);
+    assert_eq!(active_col.total_count, 3);
+    assert!(matches!(active_col.inferred_type, InferredType::Boolean));
 
     let _ = fs::remove_file(path);
 }
