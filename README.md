@@ -257,10 +257,10 @@ Example local results from `cargo bench`:
 
 | Benchmark | Approximate Time |
 | --- | ---: |
-| CSV, 100 rows | 107-125 microseconds |
-| CSV, 10,000 rows | 6.14-6.71 milliseconds |
-| JSON, 100 rows | 145-162 microseconds |
-| JSON, 10,000 rows | 24.0-26.4 milliseconds |
+| CSV, 100 rows | 170-213 microseconds |
+| CSV, 10,000 rows | 4.47-4.88 milliseconds |
+| JSON, 100 rows | 122-131 microseconds |
+| JSON, 10,000 rows | 14.54-15.09 milliseconds |
 
 CSV is faster here because the reader streams records row by row with low parsing overhead. JSON arrays currently require parsing the full document structure before profiling, which is simpler but less memory-efficient for very large array-style JSON files.
 

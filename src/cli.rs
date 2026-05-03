@@ -3,7 +3,7 @@ use clap::Parser;
 /// Dataset Profiler CLI
 #[derive(Parser, Debug)]
 #[command(name = "dprofile")]
-#[command(about = "Profile datasets (CSV, JSON, Parquet)")]
+#[command(about = "Profile datasets (CSV, JSON/JSONL, Parquet)")]
 #[command(version = "0.1.0")]
 pub struct Cli {
     /// Path to input file
@@ -14,7 +14,7 @@ pub struct Cli {
     #[arg(long)]
     pub config: Option<String>,
 
-    /// File format (csv, json, parquet)
+    /// File format (csv, json, jsonl, ndjson, parquet)
     #[arg(long)]
     pub format: Option<String>,
 
