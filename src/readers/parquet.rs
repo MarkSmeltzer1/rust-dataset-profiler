@@ -8,6 +8,8 @@ use tracing::info;
 
 use crate::types::{ColumnProfile, InferredType, ParquetPreview, ParquetProfile};
 
+const PROGRESS_INTERVAL_ROWS: usize = 100_000;
+
 pub fn preview_parquet(file_path: &str) -> Result<ParquetPreview, Box<dyn Error>> {
     info!("Opening Parquet file for dry run: {}", file_path);
 
@@ -76,6 +78,10 @@ pub fn profile_parquet(file_path: &str) -> Result<ParquetProfile, Box<dyn Error>
     for row_result in iter {
         let row = row_result?;
         row_count += 1;
+
+        if row_count.is_multiple_of(PROGRESS_INTERVAL_ROWS) {
+            info!("Parquet progress: {} rows processed", row_count);
+        }
 
         let mut row_width = 0usize;
 

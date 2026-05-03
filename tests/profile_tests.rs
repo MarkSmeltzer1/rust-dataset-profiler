@@ -1,15 +1,13 @@
-#[path = "../src/types.rs"]
-mod types;
+use dataset_profiler::readers::csv::{preview_csv, profile_csv};
+use dataset_profiler::readers::json::{preview_json, profile_json};
+use dataset_profiler::types::InferredType;
+use std::fs;
 
-#[path = "../src/readers/csv.rs"]
-mod csv_reader;
-
-#[path = "../src/readers/json.rs"]
-mod json_reader;
-
-use csv_reader::{preview_csv, profile_csv};
-use json_reader::{preview_json, profile_json};
-use types::InferredType;
+fn temp_file(name: &str, content: &str) -> String {
+    let path = std::env::temp_dir().join(name);
+    fs::write(&path, content).expect("test fixture should be written");
+    path.to_string_lossy().to_string()
+}
 
 #[test]
 fn test_csv_profile_basic() {
@@ -63,6 +61,29 @@ fn test_csv_preview() {
 }
 
 #[test]
+fn test_csv_headers_only_profiles_zero_rows() {
+    let path = temp_file("dprofile_headers_only.csv", "id,name,age\n");
+    let profile = profile_csv(&path, b',').expect("headers-only CSV should profile");
+
+    assert_eq!(profile.row_count, 0);
+    assert_eq!(profile.column_count, 3);
+    assert_eq!(profile.malformed_row_count, 0);
+    assert_eq!(profile.columns.len(), 3);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn test_empty_csv_returns_error() {
+    let path = temp_file("dprofile_empty.csv", "");
+    let result = profile_csv(&path, b',');
+
+    assert!(result.is_err());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
 fn test_json_profile_basic() {
     let profile = profile_json("test.json").expect("JSON profiling should succeed");
 
@@ -104,4 +125,52 @@ fn test_jsonl_profile_basic() {
     assert_eq!(profile.row_count, 3);
     assert_eq!(profile.column_count, 3);
     assert_eq!(profile.malformed_row_count, 0);
+}
+
+#[test]
+fn test_json_missing_keys_count_as_nulls() {
+    let path = temp_file(
+        "dprofile_missing_keys.json",
+        r#"
+[
+  {"id": 1, "name": "Alice"},
+  {"id": 2, "age": 30}
+]
+"#,
+    );
+
+    let profile = profile_json(&path).expect("JSON with missing keys should profile");
+
+    assert_eq!(profile.row_count, 2);
+    assert_eq!(profile.column_count, 3);
+
+    let name_col = profile.columns.iter().find(|c| c.name == "name").unwrap();
+    assert_eq!(name_col.null_count, 1);
+    assert_eq!(name_col.total_count, 2);
+
+    let age_col = profile.columns.iter().find(|c| c.name == "age").unwrap();
+    assert_eq!(age_col.null_count, 1);
+    assert_eq!(age_col.total_count, 2);
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn test_empty_json_preview_returns_error() {
+    let path = temp_file("dprofile_empty.json", "");
+    let result = preview_json(&path);
+
+    assert!(result.is_err());
+
+    let _ = fs::remove_file(path);
+}
+
+#[test]
+fn test_invalid_json_profile_returns_error() {
+    let path = temp_file("dprofile_invalid.json", "{ invalid json");
+    let result = profile_json(&path);
+
+    assert!(result.is_err());
+
+    let _ = fs::remove_file(path);
 }

@@ -29,4 +29,8 @@ pub struct Cli {
     /// Dry run (no full processing)
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+
+    /// Number of worker threads to use where supported
+    #[arg(long)]
+    pub threads: Option<usize>,
 }

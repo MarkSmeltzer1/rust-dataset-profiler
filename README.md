@@ -65,6 +65,7 @@ This reduces manual inspection and speeds up dataset onboarding.
 * `--config` TOML configuration file
 * `--verbose` structured logging
 * `--dry-run` preview mode
+* `--threads` validated thread-count setting
 * built-in `--help`
 * built-in `--version`
 
@@ -88,8 +89,8 @@ cargo --version
 ### Clone the Repository
 
 ```bash
-git clone <YOUR_REPO_URL>
-cd dataset-profiler
+git clone https://github.com/MarkSmeltzer1/rust-dataset-profiler.git
+cd rust-dataset-profiler
 ```
 
 ---
@@ -108,6 +109,31 @@ cargo build
 
 ```bash
 cargo run -- --file <path_to_file>
+```
+
+---
+
+### Example Output
+
+```text
+CSV Profile Summary
+-------------------
+File: test.csv
+Format: csv
+Delimiter: ,
+Rows: 3
+Columns: 3
+Malformed Rows: 0
+Average Row Width: 5.67 characters
+Time Taken: 0.0417 seconds
+
+Column Stats:
+id -> type: integer, nulls: 0 (0.00%), total: 3, min: 1.00, max: 3.00, mean: 2.00
+name -> type: string, nulls: 1 (33.33%), total: 3, min_len: 3, max_len: 5, avg_len: 4.00
+age -> type: integer, nulls: 0 (0.00%), total: 3, min: 22.00, max: 30.00, mean: 25.67
+
+Column Warnings:
+- name -> moderate missingness (33.33% null)
 ```
 
 ---
@@ -161,6 +187,18 @@ without full profiling.
 cargo run -- --file test.csv --verbose
 ```
 
+Verbose mode also logs progress every 100,000 rows for large CSV, JSON, and Parquet profiles.
+
+---
+
+### Thread Setting
+
+```bash
+cargo run -- --file test.csv --threads 2
+```
+
+The current readers are primarily streaming and single-threaded. The flag is validated and logged so runs are explicit about the requested thread setting.
+
 ---
 
 ### Config File Usage
@@ -172,6 +210,16 @@ cargo run -- --file test.csv --config config.toml
 ```
 
 CLI arguments override config values.
+
+Example config:
+
+```toml
+format = "csv"
+delimiter = ","
+verbose = false
+dry_run = false
+threads = 1
+```
 
 ---
 
@@ -191,23 +239,80 @@ cargo test -- --nocapture
 
 ---
 
+## Running Benchmarks
+
+Run Criterion benchmarks:
+
+```bash
+cargo bench
+```
+
+The benchmark suite profiles generated CSV and JSON fixtures at small and medium sizes. Results are written under `target/criterion/`.
+
+Example local results from a short Criterion run:
+
+| Benchmark | Approximate Time |
+| --- | ---: |
+| CSV, 100 rows | 68-95 microseconds |
+| CSV, 10,000 rows | 4.1-5.3 milliseconds |
+| JSON, 100 rows | 179-246 microseconds |
+| JSON, 10,000 rows | 22.9-28.1 milliseconds |
+
+CSV is faster here because the reader streams records row by row with low parsing overhead. JSON arrays currently require parsing the full document structure before profiling, which is simpler but less memory-efficient for very large array-style JSON files.
+
+---
+
 ## Project Structure
 
 ```text
 src/
-  main.rs        → entry point
-  cli.rs         → CLI argument parsing
-  config.rs      → config file handling
-  logging.rs     → logging setup
-  types.rs       → shared data structures
+  main.rs        -> CLI entry point and application flow
+  lib.rs         -> reusable crate modules for tests and benchmarks
+  cli.rs         -> CLI argument parsing
+  config.rs      -> config file handling
+  errors.rs      -> custom error types and fatal exit helper
+  logging.rs     -> logging setup
+  types.rs       -> shared data structures
   readers/
-    csv.rs       → CSV profiling
-    json.rs      → JSON profiling
-    parquet.rs   → Parquet profiling
+    csv.rs       -> CSV profiling
+    json.rs      -> JSON profiling
+    parquet.rs   -> Parquet profiling
 
 tests/
-  profile_tests.rs → integration tests
+  cli_error_tests.rs -> CLI and error behavior tests
+  profile_tests.rs   -> integration tests
+
+benches/
+  profile_benchmarks.rs -> Criterion performance benchmarks
 ```
+
+---
+
+## How It Works
+
+1. `main.rs` parses CLI arguments with `clap`.
+2. If `--config` is provided, `config.rs` loads TOML settings.
+3. CLI values override config values.
+4. `logging.rs` initializes structured logging based on `--verbose` or config.
+5. `main.rs` validates the file path, format, and thread count.
+6. The correct reader in `src/readers/` previews or profiles the file.
+7. Reader modules fill shared structs from `types.rs`.
+8. `main.rs` prints the final summary, column stats, warnings, and runtime.
+
+---
+
+## Warning Rules
+
+Column warnings are heuristic checks meant to flag data that may need review:
+
+* moderate missingness: at least 20% null values
+* high missingness: at least 50% null values
+* mixed or complex type: values do not fit one simple inferred type
+* constant numeric column: all observed numeric values are the same
+* negative values: numeric minimum is below zero
+* extreme numeric range: absolute minimum or maximum is above 1,000,000
+
+Warnings do not always mean the data is wrong. They are prompts for investigation before building a pipeline.
 
 ---
 
@@ -215,9 +320,12 @@ tests/
 
 * Uses structured logging (`tracing`)
 * Supports verbose mode
+* Logs file open, format selection, profiling start/end, malformed rows, column warnings, and large-file progress
 * Provides clear error messages for:
 
   * invalid files
+  * invalid arguments
+  * invalid config files
   * parsing issues
   * unsupported formats
 * Designed to fail gracefully with meaningful output
@@ -242,6 +350,16 @@ Processed row-by-row to avoid loading entire file into memory.
 
 ---
 
+## Limitations
+
+* Standard JSON arrays are parsed in memory; NDJSON is preferred for large JSON datasets.
+* `--threads` is currently validated and logged, but the readers are mostly single-threaded.
+* Parquet profiling uses the row-based API, which is simpler but not as optimized as Arrow batch processing.
+* Type inference is heuristic-based and may classify timestamps or nested structures as mixed.
+* Benchmarks are local measurements and can vary by machine.
+
+---
+
 ## Current Status
 
 Completed:
@@ -252,17 +370,32 @@ Completed:
 * CLI interface
 * Config support
 * Structured logging
-* Initial test suite
+* Edge-case and CLI test coverage
+* Criterion benchmark setup
+* Progress logging for large datasets
+* Thread-count flag and validation
 
 ---
 
-## Work In Progress
+## Rubric Alignment
 
-* Additional edge-case tests
-* Benchmarking
-* Threading support (`--threads`)
-* Progress tracking for large datasets
-* Documentation improvements
+This project now addresses the main production-ready rubric categories:
+
+* CLI and UX: help/version support, validation, config overrides, dry-run, verbose mode, and thread flag
+* Implementation: CSV, JSON/NDJSON, and Parquet profiling with streaming where practical
+* Data engineering thinking: schema shape, type hints, null patterns, malformed rows, average row width, and quality warnings
+* Logging and observability: structured logs, warning/error levels, progress logging, row counts, and runtime summaries
+* Testing: core profiling tests, CLI error tests, config behavior tests, and edge-case tests
+* Benchmarking: Criterion benchmarks for CSV and JSON profiling
+* Documentation: usage, examples, architecture, warning rules, benchmark results, limitations, and trade-offs
+
+---
+
+## Remaining Improvements
+
+* Optional small Parquet fixture tests
+* Potential Arrow-based Parquet optimization
+* Real parallel profiling implementation behind `--threads`
 
 ---
 
