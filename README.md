@@ -388,46 +388,41 @@ Processed row-by-row to avoid loading entire file into memory.
 
 ---
 
-## Current Status
+## Validation Coverage
 
-Completed:
+The project includes automated and manual validation for the major code paths:
 
-* Multi-format support (CSV, JSON, Parquet)
-* Automated EDA metrics
-* Data quality warnings
-* CLI interface
-* Config support
-* Structured logging
-* Edge-case and CLI test coverage
-* Parquet automated test coverage
-* Criterion benchmark setup
-* Progress logging for large datasets
-* Thread-count flag and validation
+* CLI argument and error behavior
+* Config loading and CLI override behavior
+* CSV profiling, preview, malformed rows, empty files, and headers-only files
+* JSON and JSONL profiling, preview, missing keys, empty input, and invalid JSON
+* Parquet profiling and preview using generated temporary Parquet fixtures
+* Criterion benchmarks for CSV and JSON profiling
+* Manual large-file runs for CSV, JSONL, and Parquet
 
----
+Recommended quality checks:
 
-## Rubric Alignment
-
-This project now addresses the main production-ready rubric categories:
-
-* CLI and UX: help/version support, validation, config overrides, dry-run, verbose mode, and thread flag
-* Implementation: CSV, JSON/NDJSON, and Parquet profiling with streaming where practical
-* Data engineering thinking: schema shape, type hints, null patterns, malformed rows, average row width, and quality warnings
-* Logging and observability: structured logs, warning/error levels, progress logging, row counts, and runtime summaries
-* Testing: core profiling tests, Parquet tests, CLI error tests, config behavior tests, and edge-case tests
-* Benchmarking: Criterion benchmarks for CSV and JSON profiling
-* Documentation: usage, examples, architecture, warning rules, benchmark results, limitations, and trade-offs
+```bash
+cargo fmt
+cargo test
+cargo clippy --all-targets -- -D warnings
+cargo bench
+```
 
 ---
 
-## Remaining Improvements
+## Roadmap
 
-* Potential Arrow-based Parquet optimization
-* Real parallel profiling implementation behind `--threads`
+The current implementation is intended to be practical and maintainable without unnecessary complexity. Future optimization work could include:
+
+* Arrow-based Parquet batch processing for faster columnar profiling
+* True parallel batch processing behind `--threads`
+* Optional machine-readable JSON output for downstream automation
+* More advanced logical type handling for timestamps and nested values
 
 ---
 
-## Contribution Workflow
+## Development Workflow
 
 ```bash
 git pull
@@ -439,9 +434,3 @@ git push
 ```
 
 ---
-
-## Summary
-
-This project is a multi-format dataset profiler that automates the first stage of data engineering: understanding the dataset.
-
-It provides structure analysis, data quality insights, and automated EDA to reduce manual effort and improve pipeline reliability.
